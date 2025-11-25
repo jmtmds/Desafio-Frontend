@@ -1,7 +1,7 @@
 # Loja Virtual (Mobile App)
 
 ![Status](https://img.shields.io/badge/status-concluído-green)
-![Tech](https://img.shields.io/badge/tech-React%20Native%20|%20Expo-blue)
+![Tech](https://img.shields.io/badge/tech-React%20Native%20|%20Expo-purple)
 ![Linguagem](https://img.shields.io/badge/linguagem-TypeScript-blue.svg)
 
 > Um aplicativo mobile multiplataforma (Android, iOS e Web) para gerenciamento de produtos, consumindo uma API REST própria.
