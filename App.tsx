@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet, Text, View, FlatList, TextInput,
-  TouchableOpacity, Modal, Alert, SafeAreaView, Platform
+  TouchableOpacity, Modal, Alert, SafeAreaView, Platform, StatusBar
 } from 'react-native';
 import axios from 'axios';
+import { Feather } from '@expo/vector-icons';
 
-// --- Configuração Inteligente de IP ---
-// Se for Web ou iOS, usa localhost.
-// Se for Android Emulator, usa 10.0.2.2 (ponte para o PC).
+// --- Configuração de IP ---
 const API_URL = Platform.OS === 'android'
   ? 'http://10.0.2.2:3000/products'
   : 'http://localhost:3000/products';
@@ -22,45 +21,31 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
-  // States do Formulário
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
 
-  // --- Funções CRUD ---
-
+  // Lógica
   const fetchProducts = async () => {
     try {
-      console.log(`Buscando em: ${API_URL}`); // Debug para ver qual IP está usando
       const response = await axios.get(API_URL);
       setProducts(response.data);
     } catch (error) {
-      console.error("Erro ao buscar:", error);
-      // No Web, o Alert não funciona igual no mobile, então usamos console
-      if (Platform.OS === 'web') {
-        console.log("Erro de conexão. Verifique se o backend está rodando.");
-      } else {
-        Alert.alert("Erro", "Não foi possível conectar ao servidor");
-      }
+      console.error("Erro conexão:", error);
     }
   };
 
   const handleSave = async () => {
     if (!name.trim() || !price.trim()) return;
-
     try {
       if (editingProduct) {
-        // Editar
         await axios.put(`${API_URL}/${editingProduct.id}`, { name, price });
       } else {
-        // Criar
         await axios.post(API_URL, { name, price });
       }
       fetchProducts();
       closeModal();
     } catch (error) {
-      console.error(error);
-      Alert.alert("Erro", "Falha ao salvar produto");
+      Alert.alert("Erro", "Falha ao salvar");
     }
   };
 
@@ -69,12 +54,9 @@ export default function App() {
       await axios.delete(`${API_URL}/${id}`);
       fetchProducts();
     } catch (error) {
-      console.error(error);
       Alert.alert("Erro", "Falha ao deletar");
     }
   };
-
-  // --- Controles de UI ---
 
   const openModalEdit = (product: Product) => {
     setEditingProduct(product);
@@ -99,20 +81,28 @@ export default function App() {
     fetchProducts();
   }, []);
 
-  // --- Renderização ---
+  // Formatação de Moeda
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
 
+  // Renderização dos Itens
   const renderItem = ({ item }: { item: Product }) => (
     <View style={styles.card}>
-      <View>
+      <View style={styles.cardInfo}>
         <Text style={styles.cardTitle}>{item.name}</Text>
-        <Text style={styles.cardPrice}>R$ {Number(item.price).toFixed(2)}</Text>
+        <Text style={styles.cardPrice}>{formatCurrency(Number(item.price))}</Text>
       </View>
+
       <View style={styles.cardActions}>
-        <TouchableOpacity onPress={() => openModalEdit(item)} style={styles.btnEdit}>
-          <Text style={styles.btnText}>Edit</Text>
+        <TouchableOpacity onPress={() => openModalEdit(item)} style={styles.actionBtn}>
+          <Feather name="edit-2" size={20} color="#4F46E5" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.btnDelete}>
-          <Text style={styles.btnText}>X</Text>
+        <TouchableOpacity onPress={() => handleDelete(item.id)} style={[styles.actionBtn, styles.deleteBtn]}>
+          <Feather name="trash-2" size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
     </View>
@@ -120,49 +110,66 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Loja Virtual</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#F3F4F6" />
+
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Meus Produtos</Text>
+        <Text style={styles.headerSubtitle}>{products.length} itens cadastrados</Text>
+      </View>
 
       <FlatList
         data={products}
         keyExtractor={item => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nenhum produto cadastrado.</Text>}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Feather name="shopping-bag" size={48} color="#9CA3AF" />
+            <Text style={styles.emptyText}>Sua loja está vazia.</Text>
+            <Text style={styles.emptySubText}>Clique no + para adicionar.</Text>
+          </View>
+        }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={openModalCreate}>
-        <Text style={styles.fabText}>+</Text>
+      <TouchableOpacity style={styles.fab} onPress={openModalCreate} activeOpacity={0.8}>
+        <Feather name="plus" size={30} color="#FFF" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} animationType="fade" transparent>
+      <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingProduct ? 'Editar Produto' : 'Novo Produto'}
-            </Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingProduct ? 'Editar Produto' : 'Novo Item'}
+              </Text>
+              <TouchableOpacity onPress={closeModal}>
+                <Feather name="x" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
 
+            <Text style={styles.label}>Nome do Produto</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nome do produto"
+              placeholder="Ex: Headset Gamer"
+              placeholderTextColor="#9CA3AF"
               value={name}
               onChangeText={setName}
             />
+
+            <Text style={styles.label}>Preço (R$)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Preço (ex: 150.90)"
+              placeholder="0,00"
+              placeholderTextColor="#9CA3AF"
               value={price}
               onChangeText={setPrice}
               keyboardType="numeric"
             />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity onPress={closeModal} style={styles.btnCancel}>
-                <Text style={styles.btnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSave} style={styles.btnSave}>
-                <Text style={styles.btnText}>Salvar</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={handleSave} style={styles.btnSave} activeOpacity={0.8}>
+              <Text style={styles.btnSaveText}>Salvar Alterações</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -171,24 +178,60 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5', paddingTop: Platform.OS === 'android' ? 40 : 0 },
-  header: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginVertical: 20, color: '#333' },
-  list: { padding: 20, paddingBottom: 100 },
-  emptyText: { textAlign: 'center', color: '#999', marginTop: 50 },
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
-  cardTitle: { fontSize: 18, fontWeight: '600', color: '#333' },
-  cardPrice: { color: '#2ecc71', fontWeight: 'bold', fontSize: 16, marginTop: 4 },
-  cardActions: { flexDirection: 'row', gap: 10 },
-  btnEdit: { backgroundColor: '#f1c40f', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  btnDelete: { backgroundColor: '#e74c3c', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: 'bold' },
-  fab: { position: 'absolute', bottom: 30, right: 30, backgroundColor: '#3498db', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, elevation: 8 },
-  fabText: { color: '#fff', fontSize: 32, marginTop: -2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', padding: 25, borderRadius: 16, shadowColor: '#000', shadowOpacity: 0.2, elevation: 5 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#333' },
-  input: { borderWidth: 1, borderColor: '#e1e1e1', backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginBottom: 15, fontSize: 16 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 15 },
-  btnCancel: { backgroundColor: '#95a5a6', padding: 15, borderRadius: 10, flex: 1, alignItems: 'center' },
-  btnSave: { backgroundColor: '#3498db', padding: 15, borderRadius: 10, flex: 1, alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#F3F4F6', paddingTop: Platform.OS === 'android' ? 30 : 0 },
+
+  // Header
+  headerContainer: { paddingHorizontal: 24, paddingVertical: 20, backgroundColor: '#FFF', marginBottom: 10 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#111827' },
+  headerSubtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+
+  // Lista
+  list: { paddingHorizontal: 20, paddingBottom: 100 },
+
+  // Card
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    // Sombras
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2
+  },
+  cardInfo: { flex: 1 },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 4 },
+  cardPrice: { fontSize: 18, fontWeight: '800', color: '#059669' },
+
+  cardActions: { flexDirection: 'row', gap: 12 },
+  actionBtn: { padding: 8, backgroundColor: '#EEF2FF', borderRadius: 10 },
+  deleteBtn: { backgroundColor: '#FEF2F2' },
+
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyText: { fontSize: 18, fontWeight: '600', color: '#4B5563', marginTop: 16 },
+  emptySubText: { fontSize: 14, color: '#9CA3AF', marginTop: 4 },
+
+  fab: {
+    position: 'absolute', bottom: 30, right: 30,
+    backgroundColor: '#4F46E5', // Azul Índigo Moderno
+    width: 64, height: 64, borderRadius: 32,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8
+  },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 30, minHeight: 400 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
+
+  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 12 },
+  input: {
+    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
+    borderRadius: 12, padding: 16, fontSize: 16, color: '#111827'
+  },
+
+  btnSave: { backgroundColor: '#4F46E5', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 32 },
+  btnSaveText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });
